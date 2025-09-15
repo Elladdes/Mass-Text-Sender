@@ -42,7 +42,7 @@ app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
 # Secret key is required for some Flask features like flashing messages
 # (Flashing is how Flask shows temporary alerts like "Upload successful" or "No file selected")
-app.secret_key = "supersecret"
+app.secret_key = os.getenv('FLASK_SECRET_KEY')
 
 
 # --- Helper functions ---
@@ -164,8 +164,6 @@ def index():
 
                         # Pause for 1 second to avoid hitting API rate limits
                         time.sleep(1)
-
-                    
 
             # After sending all SMS messages, show the results in the template
             return render_template("index.html", results=results)
