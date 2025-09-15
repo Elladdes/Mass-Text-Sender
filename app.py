@@ -127,7 +127,6 @@ def send_sms(sender, to, message):
 # --- Main route (the page people see when they visit the app) ---
 
 @app.route("/", methods=["GET", "POST"])
-@requires_auth
 def index():
     """
     This function handles both displaying the form (GET request)
