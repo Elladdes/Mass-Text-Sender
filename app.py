@@ -4,14 +4,66 @@ import time     # Allows adding delays (we use this to pause between SMS sends t
 import csv      # Used for reading contact data from uploaded CSV files
 import requests # A library to send HTTP requests (we use this to call the Dialpad API)
 import re
+from collections import defaultdict
+import phonenumbers
+import logging
 
 # Import parts of Flask (the web framework)
-from flask import Flask, request, render_template, redirect, url_for, flash
+from flask import Flask, request, render_template, redirect, url_for, flash, Response
+
+
+acr_to_url = {
+    "AAS": "usautosummit",
+    "AMD": "amdsummit",
+    "AAD": "aadsummit",
+    "AMS": "manusummit",
+    "BIO": "biomanamerica",
+    "ASC": "supplychainus",
+    "PMOS": "posummit",
+    "APS": "uspacksummit",
+    "CIO": "cioamerica",
+    "FMS": "foodmansummit",
+    "CMS": "chemmansummit"
+}
+
+
+app = Flask(__name__)
+
+logging.basicConfig(level=logging.INFO, filename="sms_errors.log",
+                    format="%(asctime)s - %(levelname)s - %(message)s")
+
+def check_auth(username, password):
+    return username == os.getenv("FLASK_USER") and password == os.getenv("FLASK_PASSWORD")
+
+
+def authenticate():
+    return Response(
+        'Could not verify your access.\n'
+        'You need proper credentials.', 401,
+        {'WWW-Authenticate': 'Basic realm="Login Required"'}
+    )
+
+def requires_auth(f):
+    from functools import wraps
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth = request.authorization
+        if not auth or not check_auth(auth.username, auth.password):
+            return authenticate()
+        return f(*args, **kwargs)
+    return decorated
+
+@app.before_request
+def require_auth_for_all_pages():
+    if request.endpoint != 'static':  # allow static files
+        auth = request.authorization
+        if not auth or not check_auth(auth.username, auth.password):
+            return authenticate()
+
+# --- Configuration section ---
 
 from dotenv import load_dotenv
 load_dotenv()  # Loads the .env file
-
-# --- Configuration section ---
 
 # Your Dialpad API key (replace this with a real one from your Dialpad account)
 API_KEY = os.getenv('DIALPAD_API_KEY')
@@ -35,7 +87,7 @@ ALLOWED_EXTENSIONS = {"csv"}
 
 # Create a Flask web application
 # __name__ tells Flask where to look for templates and static files
-app = Flask(__name__)
+
 
 # Configure the app to know where uploaded files go
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
@@ -75,6 +127,7 @@ def send_sms(sender, to, message):
 # --- Main route (the page people see when they visit the app) ---
 
 @app.route("/", methods=["GET", "POST"])
+@requires_auth
 def index():
     """
     This function handles both displaying the form (GET request)
@@ -87,6 +140,9 @@ def index():
         # Get the message the user typed into the form
         message = request.form["message"]
         sender_number = request.form["sender_number"]
+        if not sender_number:
+            flash("Sender number is required.")
+            return redirect(request.url)
         # Check that a file was actually uploaded
         if "file" not in request.files:
             flash("No file part")  # Show an alert message on the page
@@ -135,35 +191,40 @@ def index():
                     unique_numbers = list(set(num for num in all_numbers if num))
 
                     #match event acronym to event url
-                    acr_to_url = {
-                        "AAS": "usautosummit",
-                        "AMD": "amdsummit",
-                        "AAD": "aadsummit",
-                        "AMS": "manusummit",
-                        "BIO": "biomanamerica",
-                        "ASC": "supplychainus",
-                        "PMOS": "posummit",
-                        "APS": "uspacksummit",
-                        "CIO": "cioamerica",
-                        "FMS": "foodmansummit",
-                        "CMS": "chemmansummit"
-                    }
 
                     event_url = acr_to_url.get(event_acr)
+                    if not event_url:
+                        event_url = "amdsummit"
                     catalog_url = f"catalog.{event_url}.com/user/login"
 
                     # Replace placeholder {name}, {username}, {password}, ... in the message with the csv row
-                    personalized_msg = message.format(name=name, username=username, password=password, catalog=catalog_url, event=event)
+                    
+                    placeholders = defaultdict(str, {
+                        "name": name, "username": username,
+                        "password": password, "catalog": catalog_url,
+                        "event": event
+                    })
+                    personalized_msg = message.format_map(placeholders)
 
-                    # Send the SMS using our helper function
+                    #send sms to all numbers through for loop
                     for phone in unique_numbers:
+                        #normalize all phone numbers
+                        try:
+                            parsed = phonenumbers.parse(phone, "US")
+                            phone = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
+                        except phonenumbers.NumberParseException as e:
+                            logging.warning(f"Invalid phone number '{phone}' for {name}: {e}")
+                            continue
+
+
+                        # Send the SMS using our helper function
                         status, data = send_sms(sender_number, phone, personalized_msg)
 
                         # Add the result to our list (to show on the results page)
                         results.append((phone, status, data))
 
-                        # Pause for 1 second to avoid hitting API rate limits
-                        time.sleep(1)
+                        # Pause for half a second to avoid hitting API rate limits
+                        time.sleep(0.50)
 
             # After sending all SMS messages, show the results in the template
             return render_template("index.html", results=results)
