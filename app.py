@@ -7,6 +7,7 @@ import re
 from collections import defaultdict
 import phonenumbers
 import logging
+from functools import wraps
 
 # Import parts of Flask (the web framework)
 from flask import Flask, request, render_template, redirect, url_for, flash, Response
@@ -36,16 +37,14 @@ logging.basicConfig(level=logging.INFO, filename="sms_errors.log",
 def check_auth(username, password):
     return username == os.getenv("FLASK_USER") and password == os.getenv("FLASK_PASSWORD")
 
-
 def authenticate():
+    """Sends a 401 response that enables basic auth"""
     return Response(
-        'Could not verify your access.\n'
-        'You need proper credentials.', 401,
-        {'WWW-Authenticate': 'Basic realm="Login Required"'}
+        "Login required", 401,
+        {"WWW-Authenticate": 'Basic realm="Login Required"'}
     )
 
 def requires_auth(f):
-    from functools import wraps
     @wraps(f)
     def decorated(*args, **kwargs):
         auth = request.authorization
@@ -53,13 +52,6 @@ def requires_auth(f):
             return authenticate()
         return f(*args, **kwargs)
     return decorated
-
-@app.before_request
-def require_auth_for_all_pages():
-    if request.endpoint != 'static':  # allow static files
-        auth = request.authorization
-        if not auth or not check_auth(auth.username, auth.password):
-            return authenticate()
 
 # --- Configuration section ---
 
@@ -127,6 +119,7 @@ def send_sms(sender, to, message):
 # --- Main route (the page people see when they visit the app) ---
 
 @app.route("/", methods=["GET", "POST"])
+@requires_auth
 def index():
     """
     This function handles both displaying the form (GET request)
