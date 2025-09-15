@@ -10,7 +10,8 @@ import logging
 
 # Import parts of Flask (the web framework)
 from flask import Flask, request, render_template, redirect, url_for, flash, Response
-
+from dotenv import load_dotenv
+load_dotenv()  # Loads the .env file
 
 acr_to_url = {
     "AAS": "usautosummit",
@@ -62,8 +63,7 @@ def require_auth_for_all_pages():
 
 # --- Configuration section ---
 
-from dotenv import load_dotenv
-load_dotenv()  # Loads the .env file
+
 
 # Your Dialpad API key (replace this with a real one from your Dialpad account)
 API_KEY = os.getenv('DIALPAD_API_KEY')
@@ -240,4 +240,4 @@ if __name__ == "__main__":
 
     # Run the Flask app in debug mode
     # Debug mode means the app restarts automatically if you change the code
-    app.run(debug=True)
+    app.run()
