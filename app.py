@@ -28,6 +28,35 @@ acr_to_url = {
     "CMS": "chemmansummit"
 }
 
+from flask import Flask, request, session, redirect, url_for, render_template_string
+import os
+
+app = Flask(__name__)
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "change_this")
+
+USERNAME = os.getenv("APP_USERNAME", "admin")
+PASSWORD = os.getenv("APP_PASSWORD", "secret")
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        if request.form["username"] == USERNAME and request.form["password"] == PASSWORD:
+            session["logged_in"] = True
+            return redirect(url_for("index"))
+        return "Invalid credentials", 401
+    return render_template_string("""
+        <form method="post">
+          <input type="text" name="username" placeholder="Username"><br>
+          <input type="password" name="password" placeholder="Password"><br>
+          <button type="submit">Login</button>
+        </form>
+    """)
+
+@app.before_request
+def require_login():
+    if request.endpoint not in ("login", "static") and not session.get("logged_in"):
+        return redirect(url_for("login"))
+
 
 app = Flask(__name__)
 
