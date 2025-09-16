@@ -61,7 +61,7 @@ def login():
             flash("Invalid credentials", "danger")
 
     # --- Render login page ---
-    render_template("login.html")
+    return render_template("login.html")
 
 
 @app.route("/logout")
