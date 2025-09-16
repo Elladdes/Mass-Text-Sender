@@ -78,7 +78,7 @@ API_KEY = os.getenv('DIALPAD_API_KEY')
 
 
 # The Dialpad API endpoint for sending SMS messages
-URL = "https://api.dialpad.com/v2/sms"
+URL = "https://dialpad.com/api/v2/sms"
 
 # Headers to send with every API request
 # "Authorization" is how we tell Dialpad who we are (using the API key)
@@ -109,7 +109,7 @@ def allowed_file(filename):
 
 def send_sms(sender, to, message):
 
-    payload = {"to": to, "from": sender, "text": message}
+    payload = {"to_numbers": to, "from_number": sender, "text": message}
     response = requests.post(URL, headers=HEADERS, json=payload)
     return response.status_code, response.json()
 
