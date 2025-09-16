@@ -62,12 +62,26 @@ def login():
             flash("Invalid credentials", "danger")
     return render_template_string("""
         <h2>Login</h2>
-        <form method="post">
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <ul>
+            {% for category, message in messages %}
+                <li style="color: {% if category=='danger' %}red{% else %}green{% endif %};">
+                {{ message }}
+                </li>
+            {% endfor %}
+            </ul>
+        {% endif %}
+        {% endwith %}
+
+        <form method="post" action="{{ url_for('login') }}">
             <input type="text" name="username" placeholder="Username" required><br><br>
             <input type="password" name="password" placeholder="Password" required><br><br>
             <button type="submit">Login</button>
         </form>
     """)
+
 
 
 @app.route("/logout")
