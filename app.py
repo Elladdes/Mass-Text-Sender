@@ -35,8 +35,8 @@ app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "change_this")
 
 # --- Authentication Setup ---
-VALID_USERNAME = os.getenv("APP_USERNAME", "admin")
-VALID_PASSWORD = os.getenv("APP_PASSWORD", "password")
+VALID_USERNAME = os.getenv("APP_USERNAME")
+VALID_PASSWORD = os.getenv("APP_PASSWORD")
 
 def login_required(f):
     """Decorator to protect routes that require login."""
