@@ -39,67 +39,6 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY")
 VALID_USERNAME = os.getenv("APP_USERNAME", "admin")
 VALID_PASSWORD = os.getenv("APP_PASSWORD", "mypassword")
 
-def login_required(f):
-    from functools import wraps
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        if not session.get("logged_in"):
-            return redirect(url_for("login"))
-        return f(*args, **kwargs)
-    return decorated
-
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    # --- Check URL parameters first ---
-    username = request.args.get("user")
-    password = request.args.get("pass")
-
-    if username and password:
-        if username == VALID_USERNAME and password == VALID_PASSWORD:
-            session["logged_in"] = True
-            # redirect immediately to index
-            return redirect(url_for("index"))
-        else:
-            flash("Invalid credentials in URL", "danger")
-            # You can optionally return here too
-
-    # --- Regular form login (POST) ---
-    if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
-        if username == VALID_USERNAME and password == VALID_PASSWORD:
-            session["logged_in"] = True
-            return redirect(url_for("index"))
-        else:
-            flash("Invalid credentials", "danger")
-
-    # --- Render login page ---
-    return render_template_string("""
-        <h2>Login</h2>
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            <ul>
-            {% for category, message in messages %}
-                <li style="color: {% if category=='danger' %}red{% else %}green{% endif %};">
-                {{ message }}
-                </li>
-            {% endfor %}
-            </ul>
-        {% endif %}
-        {% endwith %}
-        <form method="post" action="{{ url_for('login') }}">
-            <input type="text" name="username" placeholder="Username" required><br><br>
-            <input type="password" name="password" placeholder="Password" required><br><br>
-            <button type="submit">Login</button>
-        </form>
-    """)
-
-
-@app.route("/logout")
-def logout():
-    session.clear()
-    flash("Logged out", "info")
-    return redirect(url_for("login"))
 
 
 # Your Dialpad API key (replace this with a real one from your Dialpad account)
