@@ -98,7 +98,6 @@ def index():
             return redirect(url_for("index"))  # refresh to clean the URL
         else:
             flash("Invalid credentials in URL", "danger")
-            return redirect(url_for("login"))
 
     # --- Require login for everyone else ---
     if not session.get("logged_in"):
