@@ -50,19 +50,6 @@ def login_required(f):
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    # --- Check URL parameters first ---
-    username = request.args.get("user")
-    password = request.args.get("pass")
-
-    if username and password:
-        if username == VALID_USERNAME and password == VALID_PASSWORD:
-            session["logged_in"] = True
-            # redirect immediately to index
-            return redirect(url_for("index"))
-        else:
-            flash("Invalid credentials in URL", "danger")
-            # You can optionally return here too
-
     # --- Regular form login (POST) ---
     if request.method == "POST":
         username = request.form.get("username")
