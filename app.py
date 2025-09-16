@@ -57,7 +57,7 @@ def login():
         if username == VALID_USERNAME and password == VALID_PASSWORD:
             session["logged_in"] = True
             flash("Login successful!", "success")
-            return redirect(url_for("index"))
+            return "Login successful!"
         else:
             flash("Invalid credentials", "danger")
     return render_template_string("""
@@ -119,8 +119,6 @@ ALLOWED_EXTENSIONS = {"csv"}
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
 # Secret key is required for some Flask features like flashing messages
-# (Flashing is how Flask shows temporary alerts like "Upload successful" or "No file selected")
-app.secret_key = os.getenv('FLASK_SECRET_KEY')
 
 
 # --- Helper functions ---
