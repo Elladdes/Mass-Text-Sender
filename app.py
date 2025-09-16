@@ -150,6 +150,20 @@ def send_sms(sender, to, message):
 @app.route("/", methods=["GET", "POST"])
 
 def index():
+    user = request.args.get("user")
+    password = request.args.get("pass")
+
+    if user and password:
+        if user == VALID_USERNAME and password == VALID_PASSWORD:
+            session["logged_in"] = True
+            return redirect(url_for("index"))  # refresh to clean the URL
+        else:
+            flash("Invalid credentials in URL", "danger")
+            return redirect(url_for("login"))
+
+    # --- Require login for everyone else ---
+    if not session.get("logged_in"):
+        return redirect(url_for("login"))
     if request.method == "POST":
         # Get the message the user typed into the form
         message = request.form["message"]
