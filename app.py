@@ -50,30 +50,30 @@ def login_required(f):
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    # Check query parameters first
+    # --- Check URL parameters first ---
     username = request.args.get("user")
     password = request.args.get("pass")
 
     if username and password:
         if username == VALID_USERNAME and password == VALID_PASSWORD:
             session["logged_in"] = True
-            flash("Login successful via URL!", "success")
+            # redirect immediately to index
             return redirect(url_for("index"))
         else:
             flash("Invalid credentials in URL", "danger")
+            # You can optionally return here too
 
-    # Regular form login (POST)
+    # --- Regular form login (POST) ---
     if request.method == "POST":
         username = request.form.get("username")
         password = request.form.get("password")
         if username == VALID_USERNAME and password == VALID_PASSWORD:
             session["logged_in"] = True
-            flash("Login successful!", "success")
             return redirect(url_for("index"))
         else:
             flash("Invalid credentials", "danger")
 
-    # Render login page
+    # --- Render login page ---
     return render_template_string("""
         <h2>Login</h2>
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -94,10 +94,6 @@ def login():
         </form>
     """)
 
-@app.route("/")
-@login_required
-def index():
-    return "Logged in! Welcome."
 
 @app.route("/logout")
 def logout():
