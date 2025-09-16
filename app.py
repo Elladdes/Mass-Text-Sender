@@ -32,11 +32,11 @@ from flask import Flask, request, session, redirect, url_for, render_template_st
 import os
 
 app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "change_this")
+app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
 # --- Authentication Setup ---
-VALID_USERNAME = os.getenv("APP_USERNAME")
-VALID_PASSWORD = os.getenv("APP_PASSWORD")
+VALID_USERNAME = os.getenv("APP_USERNAME", "admin")
+VALID_PASSWORD = os.getenv("APP_PASSWORD", "mypassword")
 
 def login_required(f):
     """Decorator to protect routes that require login."""
