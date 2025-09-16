@@ -35,34 +35,47 @@ app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
 # --- Authentication Setup ---
+# Credentials
 VALID_USERNAME = os.getenv("APP_USERNAME", "admin")
 VALID_PASSWORD = os.getenv("APP_PASSWORD", "mypassword")
 
 def login_required(f):
-    """Decorator to protect routes that require login."""
     from functools import wraps
     @wraps(f)
-    def decorated_function(*args, **kwargs):
+    def decorated(*args, **kwargs):
         if not session.get("logged_in"):
             return redirect(url_for("login"))
         return f(*args, **kwargs)
-    return decorated_function
-
+    return decorated
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    # Check query parameters first
+    username = request.args.get("user")
+    password = request.args.get("pass")
+
+    if username and password:
+        if username == VALID_USERNAME and password == VALID_PASSWORD:
+            session["logged_in"] = True
+            flash("Login successful via URL!", "success")
+            return redirect(url_for("index"))
+        else:
+            flash("Invalid credentials in URL", "danger")
+
+    # Regular form login (POST)
     if request.method == "POST":
         username = request.form.get("username")
         password = request.form.get("password")
         if username == VALID_USERNAME and password == VALID_PASSWORD:
             session["logged_in"] = True
             flash("Login successful!", "success")
-            return "Login successful!"
+            return redirect(url_for("index"))
         else:
             flash("Invalid credentials", "danger")
+
+    # Render login page
     return render_template_string("""
         <h2>Login</h2>
-
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             <ul>
@@ -74,7 +87,6 @@ def login():
             </ul>
         {% endif %}
         {% endwith %}
-
         <form method="post" action="{{ url_for('login') }}">
             <input type="text" name="username" placeholder="Username" required><br><br>
             <input type="password" name="password" placeholder="Password" required><br><br>
@@ -82,12 +94,15 @@ def login():
         </form>
     """)
 
-
+@app.route("/")
+@login_required
+def index():
+    return "Logged in! Welcome."
 
 @app.route("/logout")
 def logout():
     session.clear()
-    flash("You have been logged out.", "info")
+    flash("Logged out", "info")
     return redirect(url_for("login"))
 
 
