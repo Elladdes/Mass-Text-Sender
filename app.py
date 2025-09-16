@@ -112,25 +112,11 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY')
 # --- Helper functions ---
 
 def allowed_file(filename):
-    """
-    Checks if the uploaded file has an allowed extension (e.g. .csv).
-    Returns True if valid, False otherwise.
-    """
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 def send_sms(sender, to, message):
-    """
-    Sends a single SMS message using the Dialpad API.
-    
-    Parameters:
-        to (str): The phone number of the recipient
-        message (str): The text message content
-    
-    Returns:
-        status_code (int): HTTP status code (e.g. 200 for success, 400 for error)
-        response.json() (dict): The response from Dialpad in JSON format
-    """
+
     payload = {"to": to, "from": sender, "text": message}
     response = requests.post(URL, headers=HEADERS, json=payload)
     return response.status_code, response.json()
@@ -141,13 +127,6 @@ def send_sms(sender, to, message):
 @app.route("/", methods=["GET", "POST"])
 @login_required
 def index():
-    """
-    This function handles both displaying the form (GET request)
-    and processing form submissions (POST request).
-    
-    GET → Show the upload form
-    POST → Handle uploaded CSV + message, send SMS messages
-    """
     if request.method == "POST":
         # Get the message the user typed into the form
         message = request.form["message"]
@@ -244,6 +223,9 @@ def index():
     # If GET request, or if something went wrong, just render the form again
     return render_template("index.html")
     
+@app.route("/test")
+def test():
+    return "It works!"
 
 # --- Run the app ---
 if __name__ == "__main__":
