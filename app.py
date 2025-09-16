@@ -34,56 +34,47 @@ import os
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "change_this")
 
-USERNAME = os.getenv("APP_USERNAME", "admin")
-PASSWORD = os.getenv("APP_PASSWORD", "secret")
+# --- Authentication Setup ---
+VALID_USERNAME = os.getenv("APP_USERNAME", "admin")
+VALID_PASSWORD = os.getenv("APP_PASSWORD", "password")
+
+def login_required(f):
+    """Decorator to protect routes that require login."""
+    from functools import wraps
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get("logged_in"):
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated_function
+
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        if request.form["username"] == USERNAME and request.form["password"] == PASSWORD:
+        username = request.form.get("username")
+        password = request.form.get("password")
+        if username == VALID_USERNAME and password == VALID_PASSWORD:
             session["logged_in"] = True
+            flash("Login successful!", "success")
             return redirect(url_for("index"))
-        return "Invalid credentials", 401
+        else:
+            flash("Invalid credentials", "danger")
     return render_template_string("""
+        <h2>Login</h2>
         <form method="post">
-          <input type="text" name="username" placeholder="Username"><br>
-          <input type="password" name="password" placeholder="Password"><br>
-          <button type="submit">Login</button>
+            <input type="text" name="username" placeholder="Username" required><br><br>
+            <input type="password" name="password" placeholder="Password" required><br><br>
+            <button type="submit">Login</button>
         </form>
     """)
 
-@app.before_request
-def require_login():
-    if request.endpoint not in ("login", "static") and not session.get("logged_in"):
-        return redirect(url_for("login"))
 
-
-app = Flask(__name__)
-
-logging.basicConfig(level=logging.INFO, filename="sms_errors.log",
-                    format="%(asctime)s - %(levelname)s - %(message)s")
-
-def check_auth(username, password):
-    return username == os.getenv("FLASK_USER") and password == os.getenv("FLASK_PASSWORD")
-
-def authenticate():
-    """Sends a 401 response that enables basic auth"""
-    return Response(
-        "Login required", 401,
-        {"WWW-Authenticate": 'Basic realm="Login Required"'}
-    )
-
-def requires_auth(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        auth = request.authorization
-        if not auth or not check_auth(auth.username, auth.password):
-            return authenticate()
-        return f(*args, **kwargs)
-    return decorated
-
-# --- Configuration section ---
-
+@app.route("/logout")
+def logout():
+    session.clear()
+    flash("You have been logged out.", "info")
+    return redirect(url_for("login"))
 
 
 # Your Dialpad API key (replace this with a real one from your Dialpad account)
@@ -148,7 +139,7 @@ def send_sms(sender, to, message):
 # --- Main route (the page people see when they visit the app) ---
 
 @app.route("/", methods=["GET", "POST"])
-@requires_auth
+@login_required
 def index():
     """
     This function handles both displaying the form (GET request)
