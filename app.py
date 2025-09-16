@@ -152,7 +152,7 @@ def send_sms(sender, to, message):
 # --- Main route (the page people see when they visit the app) ---
 
 @app.route("/", methods=["GET", "POST"])
-@login_required
+
 def index():
     if request.method == "POST":
         # Get the message the user typed into the form
