@@ -220,9 +220,6 @@ def index():
                         # Add the result to our list (to show on the results page)
                         results.append((phone, status, data))
 
-                        # Pause for half a second to avoid hitting API rate limits
-                        time.sleep(0.50)
-
             # After sending all SMS messages, show the results in the template
             return render_template("index.html", results=results)
 
