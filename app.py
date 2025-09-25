@@ -8,6 +8,9 @@ from collections import defaultdict
 import phonenumbers
 import logging
 from functools import wraps
+import threading
+import queue
+
 
 # Import parts of Flask (the web framework)
 from flask import Flask, request, render_template, redirect, url_for, flash, Response
@@ -113,11 +116,72 @@ def send_sms(sender, to, message):
     response = requests.post(URL, headers=HEADERS, json=payload)
     return response.status_code, response.json()
 
+def send_bulk_sms(filepath, message, sender_number):
+    results = []
+    with open(filepath, newline="") as csvfile:
+        reader = csv.DictReader(csvfile)
+
+        for row in reader:
+            # --- Your current CSV parsing and SMS logic ---
+            event = row.get("Event: Event Name", "").strip()
+            event = re.sub(r"-\d+", "", event)
+            event_acr = row.get("Event Acronym", "").strip()
+            name = row.get("Event Attendee: Event Attendee Name", "").strip()
+
+            phone = row.get("Phone", "").strip()
+            mobile = row.get("Mobile", "").strip()
+            zoom_phone = row.get("Zoom Phone", "").strip()
+            zoom_mobile_phone = row.get("Zoom Mobile Phone", "").strip()
+
+            username = row.get("Username", "").strip()
+            password = row.get("Password", "").strip()
+
+            all_numbers = [phone, mobile, zoom_phone, zoom_mobile_phone]
+            unique_numbers = list(set(num for num in all_numbers if num))
+
+            event_url = acr_to_url.get(event_acr, "amdsummit")
+            catalog_url = f"catalog.{event_url}.com/user/login"
+
+            placeholders = defaultdict(str, {
+                "name": name, "username": username,
+                "password": password, "catalog": catalog_url,
+                "event": event
+            })
+            personalized_msg = message.format_map(placeholders)
+
+            for phone in unique_numbers:
+                try:
+                    parsed = phonenumbers.parse(phone, "US")
+                    phone = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
+                except phonenumbers.NumberParseException as e:
+                    logging.warning(f"Invalid phone number '{phone}' for {name}: {e}")
+                    continue
+
+                status, data = send_sms(sender_number, phone, personalized_msg)
+                results.append((phone, status, data))
+
+    logging.info(f"Finished processing job for {filepath} with {len(results)} messages")
+    return results
+
+# --- Background Queue Setup ---
+task_queue = queue.Queue()
+
+def worker():
+    """Background worker that consumes the queue."""
+    while True:
+        task = task_queue.get()
+        if task is None:  # shutdown signal
+            break
+        send_bulk_sms(*task)  # run job
+        task_queue.task_done()
+
+# Start worker thread
+thread = threading.Thread(target=worker, daemon=True)
+thread.start()
 
 # --- Main route (the page people see when they visit the app) ---
 
 @app.route("/", methods=["GET", "POST"])
-
 def index():
     user = request.args.get("user")
     password = request.args.get("pass")
@@ -125,106 +189,43 @@ def index():
     if user and password:
         if user == VALID_USERNAME and password == VALID_PASSWORD:
             session["logged_in"] = True
-            return redirect(url_for("index"))  # refresh to clean the URL
+            return redirect(url_for("index"))
         else:
             flash("Invalid credentials in URL", "danger")
             return redirect(url_for("login"))
 
-    # --- Require login for everyone else ---
     if not session.get("logged_in"):
         return redirect(url_for("login"))
+
     if request.method == "POST":
-        # Get the message the user typed into the form
         message = request.form["message"]
         sender_number = request.form["sender_number"]
+
         if not sender_number:
             flash("Sender number is required.")
             return redirect(request.url)
-        # Check that a file was actually uploaded
+
         if "file" not in request.files:
-            flash("No file part")  # Show an alert message on the page
-            return redirect(request.url)  # Reload the form
+            flash("No file part")
+            return redirect(request.url)
 
         file = request.files["file"]
-
-        # If the user submitted without choosing a file
         if file.filename == "":
             flash("No selected file")
             return redirect(request.url)
 
-        # If the file exists and has a valid extension (CSV)
         if file and allowed_file(file.filename):
-            # Save the uploaded file into the uploads/ folder
             filepath = os.path.join(app.config["UPLOAD_FOLDER"], file.filename)
             file.save(filepath)
 
-            results = []  # Store results for each SMS (phone, status, response)
+            # 🚀 Enqueue instead of processing inline
+            task_queue.put((filepath, message, sender_number))
 
-            # Open the uploaded CSV file
-            with open(filepath, newline="") as csvfile:
-                reader = csv.DictReader(csvfile)  
-                # DictReader reads each row as a dictionary with keys = column names
+            flash("Your bulk SMS job has been queued and will be processed shortly.", "info")
+            return redirect(url_for("index"))
 
-                for row in reader:
-                    #get event name, acr and the event attendee name
-                    event = row.get("Event: Event Name", "").strip()
-                    event = re.sub(r"-\d+", "", event) #American Automotive Summit-2025 -> American Automotive Summit
-                    event_acr = row.get("Event Acronym", "").strip() #used to get the url for catalog url
-                    name = row.get("Event Attendee: Event Attendee Name", "").strip()
-
-                    #get all phone numebers
-                    phone = row.get("Phone", "").strip()
-                    mobile = row.get("Mobile", "").strip()
-                    zoom_phone = row.get("Zoom Phone", "").strip()
-                    zoom_mobile_phone = row.get("Zoom Mobile Phone", "").strip()
-
-                    #get username and password from form
-                    username = row.get("Username", "").strip()
-                    password = row.get("Password", "").strip()
-
-                    all_numbers = [phone, mobile, zoom_phone, zoom_mobile_phone]
-
-                    #remove duplicate/empty numbers
-                    unique_numbers = list(set(num for num in all_numbers if num))
-
-                    #match event acronym to event url
-
-                    event_url = acr_to_url.get(event_acr)
-                    if not event_url:
-                        event_url = "amdsummit"
-                    catalog_url = f"catalog.{event_url}.com/user/login"
-
-                    # Replace placeholder {name}, {username}, {password}, ... in the message with the csv row
-                    
-                    placeholders = defaultdict(str, {
-                        "name": name, "username": username,
-                        "password": password, "catalog": catalog_url,
-                        "event": event
-                    })
-                    personalized_msg = message.format_map(placeholders)
-
-                    #send sms to all numbers through for loop
-                    for phone in unique_numbers:
-                        #normalize all phone numbers
-                        try:
-                            parsed = phonenumbers.parse(phone, "US")
-                            phone = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
-                        except phonenumbers.NumberParseException as e:
-                            logging.warning(f"Invalid phone number '{phone}' for {name}: {e}")
-                            continue
-
-
-                        # Send the SMS using our helper function
-                        status, data = send_sms(sender_number, phone, personalized_msg)
-
-                        # Add the result to our list (to show on the results page)
-                        results.append((phone, status, data))
-
-            # After sending all SMS messages, show the results in the template
-            return render_template("index.html", results=results)
-
-    # If GET request, or if something went wrong, just render the form again
     return render_template("index.html")
+
     
 @app.route("/test")
 def test():
