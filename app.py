@@ -10,6 +10,12 @@ import logging
 from functools import wraps
 import threading
 import queue
+import redis
+from rq import Queue
+
+# Connect to Redis (default: localhost:6379)
+redis_conn = redis.Redis()
+task_queue = Queue(connection=redis_conn)
 
 
 # Import parts of Flask (the web framework)
@@ -163,21 +169,6 @@ def send_bulk_sms(filepath, message, sender_number):
     logging.info(f"Finished processing job for {filepath} with {len(results)} messages")
     return results
 
-# --- Background Queue Setup ---
-task_queue = queue.Queue()
-
-def worker():
-    """Background worker that consumes the queue."""
-    while True:
-        task = task_queue.get()
-        if task is None:  # shutdown signal
-            break
-        send_bulk_sms(*task)  # run job
-        task_queue.task_done()
-
-# Start worker thread
-thread = threading.Thread(target=worker, daemon=True)
-thread.start()
 
 # --- Main route (the page people see when they visit the app) ---
 
@@ -219,7 +210,7 @@ def index():
             file.save(filepath)
 
             # 🚀 Enqueue instead of processing inline
-            task_queue.put((filepath, message, sender_number))
+            task_queue.enqueue(send_bulk_sms, filepath, message, sender_number)
 
             flash("Your bulk SMS job has been queued and will be processed shortly.", "info")
             return redirect(url_for("index"))
