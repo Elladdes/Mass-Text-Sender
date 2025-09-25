@@ -123,6 +123,7 @@ def send_sms(sender, to, message):
     return response.status_code, response.json()
 
 def send_bulk_sms(filepath, message, sender_number):
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     results = []
     with open(filepath, newline="") as csvfile:
         reader = csv.DictReader(csvfile)
@@ -209,10 +210,13 @@ def index():
             filepath = os.path.join(app.config["UPLOAD_FOLDER"], file.filename)
             file.save(filepath)
 
-            # 🚀 Enqueue instead of processing inline
-            task_queue.enqueue(send_bulk_sms, filepath, message, sender_number)
+            # Instead of enqueuing:
+            # task_queue.enqueue(send_bulk_sms, filepath, message, sender_number)
 
-            flash("Your bulk SMS job has been queued and will be processed shortly.", "info")
+            # Run inline:
+            results = send_bulk_sms(filepath, message, sender_number)
+            flash(f"Finished sending {len(results)} messages", "info")
+
             return redirect(url_for("index"))
 
     return render_template("index.html")
